@@ -63,7 +63,7 @@ remove_db_lock() {
 
 # Main repair function
 repair_pacman() {
-    echo -e "${YELLOW}Starting Pacman database and keyring repair...${NC}"
+    echo -e "${YELLOW}==>> Starting Pacman database and keyring repair...${NC}"
 
     # Remove db lock if it exists
     echo -e "${LIGHT_BLUE}==>> Checking for pacman db lock...${NC}"

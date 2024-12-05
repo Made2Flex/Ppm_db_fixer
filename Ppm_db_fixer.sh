@@ -70,7 +70,7 @@ repair_pacman() {
     if ! check_db_lock; then
         remove_db_lock
     else
-        echo -e "${GREEN}>> Pacman db lock not found.${NC}"
+        echo -e "${GREEN}>> Pacman db is not locked.${NC}"
     fi
 
     # Remove sync databases

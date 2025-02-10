@@ -3,7 +3,7 @@
 # Script to repair Pacman package manager database and keyring issues
 # Useful after problematic mirror updates or database corruption
 
-set -euo pipefail  # Improved error handling
+set -euo pipefail
 # -e: exit on error
 # -u: treat unset variables as an error
 # -o pipefail: ensure pipeline errors are captured

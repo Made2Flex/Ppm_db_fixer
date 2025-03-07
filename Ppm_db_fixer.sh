@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#Qnk6IE1hZGUyRmxleA==
 
 # Script to repair Pacman package manager database and keyring issues
 # Useful after problematic mirror updates or database corruption
@@ -50,36 +51,55 @@ success_message() {
 check_db_lock() {
     if [[ -f /var/lib/pacman/db.lck ]]; then
         echo -e "${RED}!!! Pacman database is locked.${NC}"
-        return 1 # Return failure instead of exiting
+        return 1
     fi
-    return 0 # Return success if no lock is found
+    return 0
 }
 
 # Function to remove pacman db lock
 remove_db_lock() {
     echo -e "${LIGHT_BLUE}==>> Removing pacman db lock...${NC}"
-    sudo rm -fv /var/lib/pacman/db.lck
-}   
+    if ! sudo rm -fv /var/lib/pacman/db.lck; then
+        error_exit "Failed to remove pacman db lock"
+    fi
+}
+
+# Function to verify pacman installation
+verify_pacman_installation() {
+    if ! command -v pacman &> /dev/null; then
+        error_exit "Pacman is not installed or not in PATH"
+    fi
+}
 
 # Main repair function
 repair_pacman() {
     echo -e "${YELLOW}==>> Starting Pacman database and keyring repair...${NC}"
+    
+    # Verify pacman is installed
+    verify_pacman_installation
 
     # Remove db lock if it exists
     echo -e "${LIGHT_BLUE}==>> Checking for pacman db lock...${NC}"
     if ! check_db_lock; then
         remove_db_lock
     else
-        echo -e "${GREEN}>> Pacman db is not locked.${NC}"
+        echo -e "${GREEN}>> Pacman db lock not found.${NC}"
     fi
 
     # Remove sync databases
-    echo -e "${LIGHT_BLUE}==>> Removing sync databases...${NC}"
-    sudo rm -Rfv /var/lib/pacman/sync || error_exit "Failed to remove sync databases"
+    echo -e "${LIGHT_BLUE}==>> Backing up and removing sync databases...${NC}"
+    if [[ -d /var/lib/pacman/sync ]]; then
+        local backup_dir="/var/lib/pacman/sync_backup_$(date +%Y%m%d_%H%M%S)"
+        sudo mkdir -p "$backup_dir"
+        sudo mv /var/lib/pacman/sync/* "$backup_dir/" || error_exit "Failed to backup sync databases"
+    fi
 
     # Remove gnupg directory
-    echo -e "${LIGHT_BLUE}==>> Removing GnuPG keyring...${NC}"
-    sudo rm -Rfv /etc/pacman.d/gnupg || error_exit "Failed to remove GnuPG directory"
+    echo -e "${LIGHT_BLUE}==>> Backing up and removing GnuPG keyring...${NC}"
+    if [[ -d /etc/pacman.d/gnupg ]]; then
+        local gnupg_backup="/etc/pacman.d/gnupg_backup_$(date +%Y%m%d_%H%M%S)"
+        sudo mv /etc/pacman.d/gnupg "$gnupg_backup" || error_exit "Failed to backup GnuPG directory"
+    fi
 
     # Initialize pacman keyring
     echo -e "${LIGHT_BLUE}==>> Initializing pacman keyring...${NC}"
@@ -87,11 +107,23 @@ repair_pacman() {
 
     # Populate pacman keyring
     echo -e "${LIGHT_BLUE}==>> Populating pacman keyring...${NC}"
-    sudo pacman-key --populate || error_exit "Failed to populate pacman keyring"
+    local retry_count=3
+    for ((i=1; i<=retry_count; i++)); do
+        if sudo pacman-key --populate; then
+            break
+        elif [[ $i -eq $retry_count ]]; then
+            error_exit "Failed to populate pacman keyring after $retry_count attempts"
+        else
+            echo -e "${YELLOW}>> Retrying pacman-key populate (attempt $i of $retry_count)...${NC}"
+            sleep 2
+        fi
+    done
 
     # Synchronize and update packages
     echo -e "${LIGHT_BLUE}==>> Synchronizing and updating packages...${NC}"
-    sudo pacman -Syyuu --noconfirm || error_exit "Failed to update packages"
+    if ! sudo pacman -Syyuu --noconfirm; then
+        error_exit "Failed to update packages. Please check your internet connection and try again."
+    fi
 
     success_message "Pacman repair completed successfully!"
 }
